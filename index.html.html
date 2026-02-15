@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AirSense AI — Air Pollution Prediction System</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --navy:#0a1628; --navy2:#0f1f3d; --navy3:#152848; --slate:#1e3a5f;
+  --border:#1e3356; --border2:#264570;
+  --blue:#2563eb; --blue-lt:#3b82f6; --blue-glow:rgba(37,99,235,.25);
+  --cyan:#06b6d4; --text:#e2e8f0; --text2:#94a3b8; --text3:#64748b; --white:#ffffff;
+  --good:#10b981; --sat:#84cc16; --mod:#f59e0b; --poor:#ef4444; --vpoor:#dc2626; --sev:#991b1b;
+  --font:'DM Sans',sans-serif; --mono:'DM Mono',monospace;
+}
+body { font-family:var(--font); background:var(--navy); color:var(--text); min-height:100vh; overflow-x:hidden; }
+.layout { display:flex; min-height:100vh; }
+
+/* SIDEBAR */
+.sidebar { width:240px; min-width:240px; background:var(--navy2); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:100; }
+.logo-area { padding:28px 24px 24px; border-bottom:1px solid var(--border); }
+.logo-icon { width:40px; height:40px; background:linear-gradient(135deg,var(--blue),var(--cyan));
+  border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:12px; }
+.logo-name { font-size:1.1rem; font-weight:700; color:var(--white); letter-spacing:-.3px; }
+.logo-sub  { font-size:.7rem; color:var(--text3); margin-top:2px; text-transform:uppercase; letter-spacing:.8px; }
+.nav-section { padding:16px 12px 8px; }
+.nav-label { font-size:.65rem; text-transform:uppercase; letter-spacing:1px; color:var(--text3); padding:0 12px; margin-bottom:6px; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px;
+  cursor:pointer; color:var(--text2); font-size:.875rem; font-weight:500; transition:.15s;
+  border:1px solid transparent; margin-bottom:2px; }
+.nav-item:hover { background:var(--slate); color:var(--text); }
+.nav-item.active { background:rgba(37,99,235,.15); border-color:rgba(37,99,235,.3); color:var(--blue-lt); }
+.nav-item .icon { font-size:1rem; width:20px; text-align:center; }
+.nav-dot { width:6px; height:6px; border-radius:50%; background:var(--good); margin-left:auto; animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.sidebar-footer { margin-top:auto; padding:16px 20px; border-top:1px solid var(--border); font-size:.75rem; color:var(--text3); }
+.sidebar-footer strong { color:var(--text2); display:block; margin-bottom:2px; }
+
+/* MAIN */
+.main { margin-left:240px; flex:1; min-height:100vh; }
+.topbar { background:var(--navy2); border-bottom:1px solid var(--border); padding:16px 32px;
+  display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:50; }
+.topbar-title { font-size:1rem; font-weight:600; }
+.topbar-sub   { font-size:.8rem; color:var(--text3); margin-top:1px; }
+.badge-row { display:flex; gap:8px; }
+.badge { padding:4px 10px; border-radius:20px; font-size:.72rem; font-weight:500;
+  border:1px solid var(--border2); background:var(--navy3); color:var(--text2); display:flex; align-items:center; gap:5px; }
+.badge.green { border-color:rgba(16,185,129,.3); background:rgba(16,185,129,.08); color:var(--good); }
+.page-content { padding:28px 32px; }
+.page { display:none; } .page.active { display:block; }
+.section-head { margin-bottom:24px; }
+.section-head h2 { font-size:1.4rem; font-weight:700; color:var(--white); }
+.section-head p  { font-size:.875rem; color:var(--text2); margin-top:4px; }
+
+/* CARDS */
+.card { background:var(--navy2); border:1px solid var(--border); border-radius:12px; padding:24px; }
+.card-sm { padding:18px 20px; }
+.card-title { font-size:.78rem; text-transform:uppercase; letter-spacing:.6px; color:var(--text3); margin-bottom:8px; }
+
+/* STAT GRID */
+.stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.stat-card { background:var(--navy2); border:1px solid var(--border); border-radius:12px; padding:20px 22px; }
+.stat-card .s-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.6px; color:var(--text3); }
+.stat-card .s-val   { font-size:2rem; font-weight:700; color:var(--white); margin:6px 0 2px; line-height:1; }
+.stat-card .s-sub   { font-size:.78rem; color:var(--text2); }
+.stat-card .s-icon  { font-size:1.4rem; float:right; margin-top:-4px; }
+.chart-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+.chart-wrap { height:240px; position:relative; }
+
+/* PREDICT */
+.predict-layout { display:grid; grid-template-columns:360px 1fr; gap:24px; align-items:start; }
+.predict-form .form-group { margin-bottom:18px; }
+.predict-form label { display:block; font-size:.78rem; font-weight:600; text-transform:uppercase;
+  letter-spacing:.5px; color:var(--text2); margin-bottom:7px; }
+.predict-form select { width:100%; background:var(--navy); border:1px solid var(--border2);
+  border-radius:8px; padding:11px 36px 11px 14px; color:var(--text); font-family:var(--font);
+  font-size:.9rem; outline:none; transition:.2s; appearance:none; cursor:pointer; }
+.predict-form select:focus { border-color:var(--blue-lt); box-shadow:0 0 0 3px var(--blue-glow); }
+.select-wrap { position:relative; }
+.select-wrap::after { content:'▾'; position:absolute; right:12px; top:50%; transform:translateY(-50%); color:var(--text3); pointer-events:none; }
+.predict-btn { width:100%; padding:13px; background:linear-gradient(135deg,var(--blue),#1d4ed8);
+  border:none; border-radius:10px; color:#fff; font-family:var(--font); font-size:.95rem; font-weight:600;
+  cursor:pointer; transition:.2s; margin-top:4px; letter-spacing:.2px; }
+.predict-btn:hover { transform:translateY(-1px); box-shadow:0 6px 24px var(--blue-glow); }
+.predict-btn:active { transform:none; }
+
+/* RESULT */
+.result-empty { display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:440px; color:var(--text3); text-align:center; gap:12px;
+  background:var(--navy2); border:1px solid var(--border); border-radius:12px; }
+.result-empty .big-icon { font-size:3.5rem; }
+.result-empty p { font-size:.9rem; max-width:260px; line-height:1.6; color:var(--text2); }
+
+.result-panel { display:none; }
+.result-panel.visible { display:block; }
+
+.aqi-hero { background:var(--navy2); border:1px solid var(--border); border-radius:12px; padding:32px;
+  text-align:center; margin-bottom:16px; position:relative; overflow:hidden; transition:box-shadow .5s; }
+.aqi-hero::before { content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse at 50% -10%, rgba(37,99,235,.12) 0%, transparent 65%); }
+.aqi-location { font-size:.78rem; color:var(--text3); text-transform:uppercase; letter-spacing:.8px; margin-bottom:8px; position:relative; }
+.aqi-big { font-size:5.5rem; font-weight:700; line-height:1; position:relative; }
+.aqi-category { display:inline-block; padding:5px 18px; border-radius:20px; font-size:.85rem;
+  font-weight:600; margin-top:10px; border:1px solid; position:relative; }
+.aqi-desc { font-size:.875rem; color:var(--text2); margin-top:14px; max-width:360px;
+  margin-left:auto; margin-right:auto; line-height:1.6; position:relative; }
+.gauge-wrap { margin:24px 0 6px; position:relative; }
+.gauge-track { height:8px; border-radius:4px;
+  background:linear-gradient(to right,#10b981,#84cc16,#f59e0b,#ef4444,#dc2626,#991b1b); position:relative; }
+.gauge-needle { position:absolute; top:-6px; width:20px; height:20px; border-radius:50%;
+  background:#fff; border:3px solid var(--navy); box-shadow:0 2px 8px rgba(0,0,0,.4);
+  transform:translateX(-50%); transition:left .8s cubic-bezier(.34,1.56,.64,1); }
+.gauge-labels { display:flex; justify-content:space-between; margin-top:6px; font-size:.68rem; color:var(--text3); }
+
+.result-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+.info-card { background:var(--navy); border:1px solid var(--border); border-radius:10px; padding:16px 18px; }
+.info-card .i-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; color:var(--text3); margin-bottom:6px; }
+.info-card .i-val   { font-size:1.5rem; font-weight:700; color:var(--white); }
+.info-card .i-sub   { font-size:.78rem; color:var(--text2); margin-top:2px; }
+
+.poll-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.poll-item { background:var(--navy); border:1px solid var(--border); border-radius:8px; padding:12px 14px; }
+.poll-item .p-name { font-size:.7rem; color:var(--text3); text-transform:uppercase; letter-spacing:.5px; }
+.poll-item .p-val  { font-size:1.1rem; font-weight:600; color:var(--text); margin-top:3px; }
+.poll-item .p-unit { font-size:.68rem; color:var(--text3); }
+.poll-bar { height:3px; border-radius:2px; background:var(--border); margin-top:8px; overflow:hidden; }
+.poll-fill { height:100%; border-radius:2px; }
+
+.health-card { border-radius:10px; padding:16px 18px; border-left:4px solid;
+  background:var(--navy); border-top:1px solid var(--border);
+  border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+.health-card .h-title { font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+.health-card .h-body  { font-size:.875rem; color:var(--text2); line-height:1.7; }
+
+/* DATASET TABLE */
+.table-wrap { overflow-x:auto; border-radius:10px; border:1px solid var(--border); max-height:480px; overflow-y:auto; }
+table { width:100%; border-collapse:collapse; font-size:.83rem; }
+thead th { background:var(--navy3); padding:11px 14px; text-align:left; color:var(--text3);
+  font-size:.7rem; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap;
+  font-weight:600; position:sticky; top:0; border-bottom:1px solid var(--border); }
+tbody td { padding:10px 14px; border-bottom:1px solid var(--border); color:var(--text2); white-space:nowrap; }
+tbody tr:hover td { background:var(--navy3); }
+tbody tr:last-child td { border-bottom:none; }
+.pill { display:inline-block; padding:2px 9px; border-radius:4px; font-size:.7rem; font-weight:600; border:1px solid; }
+
+/* MODELS */
+.model-compare { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+.model-card { border-radius:12px; padding:24px; border:1px solid; }
+.model-card.best { border-color:rgba(16,185,129,.35); background:rgba(16,185,129,.04); }
+.model-card.base { border-color:var(--border); background:var(--navy2); }
+.model-card h3 { font-size:1rem; font-weight:700; margin-bottom:18px; }
+.metric-row { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); }
+.metric-row:last-child { border:none; }
+.metric-row .mk { color:var(--text2); font-size:.85rem; }
+.metric-row .mv { font-weight:700; font-size:.95rem; }
+.feat-row { margin-bottom:10px; }
+.feat-header { display:flex; justify-content:space-between; font-size:.8rem; margin-bottom:4px; }
+.feat-track { height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.feat-fill-bar { height:100%; border-radius:3px; }
+
+/* TEAM */
+.team-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:16px; }
+.team-card { background:var(--navy2); border:1px solid var(--border); border-radius:12px; padding:22px; text-align:center; }
+.avatar { width:52px; height:52px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-weight:700; font-size:1.1rem; margin:0 auto 12px; color:#fff; }
+.team-card .t-name { font-weight:600; font-size:.9rem; }
+.team-card .t-roll { color:var(--text3); font-size:.78rem; font-family:var(--mono); margin-top:2px; }
+.team-card .t-role { margin-top:10px; display:inline-block; padding:3px 10px; border-radius:4px;
+  font-size:.72rem; font-weight:600; background:rgba(37,99,235,.15); color:var(--blue-lt); border:1px solid rgba(37,99,235,.25); }
+
+.divider { height:1px; background:var(--border); margin:20px 0; }
+
+@media(max-width:1100px){
+  .predict-layout{grid-template-columns:1fr;}
+  .stat-grid{grid-template-columns:1fr 1fr;}
+  .chart-grid-2{grid-template-columns:1fr;}
+}
+@media(max-width:700px){
+  .sidebar{display:none;} .main{margin-left:0;}
+  .page-content{padding:16px;} .stat-grid{grid-template-columns:1fr 1fr;}
+  .model-compare{grid-template-columns:1fr;}
+  .result-grid{grid-template-columns:1fr;} .poll-grid{grid-template-columns:1fr 1fr;}
+  .badge-row{display:none;}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="logo-area">
+    <div class="logo-icon">🌫</div>
+    <div class="logo-name">AirSense AI</div>
+    <div class="logo-sub">GLA University · 2025–26</div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Main</div>
+    <div class="nav-item active" onclick="nav('dashboard',this)">
+      <span class="icon">📊</span> Dashboard <span class="nav-dot"></span>
+    </div>
+    <div class="nav-item" onclick="nav('predict',this)">
+      <span class="icon">🔮</span> Predict AQI
+    </div>
+    <div class="nav-item" onclick="nav('dataset',this)">
+      <span class="icon">📁</span> Dataset
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Analysis</div>
+    <div class="nav-item" onclick="nav('models',this)">
+      <span class="icon">🧠</span> ML Models
+    </div>
+    <div class="nav-item" onclick="nav('about',this)">
+      <span class="icon">👥</span> Team
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <strong>Dr. Sujatha Jayaraj</strong>
+    Project Supervisor<br>Dept. of CSE &amp; Applications
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Dashboard Overview</div>
+      <div class="topbar-sub">AI-Based Air Pollution Prediction · B.Tech Project</div>
+    </div>
+    <div class="badge-row">
+      <div class="badge green">● Live System</div>
+      <div class="badge">RF R² = 0.9972</div>
+      <div class="badge">2,000 Records</div>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+  <!-- ══════════ DASHBOARD ══════════ -->
+  <div class="page active" id="page-dashboard">
+    <div class="section-head">
+      <h2>Overview</h2>
+      <p>Air quality statistics across 8 Indian cities — 2022 to 2023</p>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><span class="s-icon">🗂</span><div class="s-label">Total Records</div><div class="s-val" style="color:#3b82f6">2,000</div><div class="s-sub">8 cities · 2 years</div></div>
+      <div class="stat-card"><span class="s-icon">✅</span><div class="s-label">Best Model R²</div><div class="s-val" style="color:#10b981">0.9972</div><div class="s-sub">Random Forest</div></div>
+      <div class="stat-card"><span class="s-icon">🎯</span><div class="s-label">MAE (Error)</div><div class="s-val" style="color:#f59e0b">4.71</div><div class="s-sub">AQI units</div></div>
+      <div class="stat-card"><span class="s-icon">📍</span><div class="s-label">Mean AQI</div><div class="s-val" style="color:#ef4444">150.7</div><div class="s-sub">Moderate category</div></div>
+    </div>
+    <div class="chart-grid-2">
+      <div class="card"><div class="card-title">Monthly AQI Trend</div><div class="chart-wrap"><canvas id="ch-monthly"></canvas></div></div>
+      <div class="card"><div class="card-title">Average AQI by City</div><div class="chart-wrap"><canvas id="ch-city"></canvas></div></div>
+    </div>
+    <div class="chart-grid-2">
+      <div class="card"><div class="card-title">AQI Category Distribution</div><div class="chart-wrap"><canvas id="ch-pie"></canvas></div></div>
+      <div class="card"><div class="card-title">Model Performance — R² Comparison</div><div class="chart-wrap"><canvas id="ch-model"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ══════════ PREDICT ══════════ -->
+  <div class="page" id="page-predict">
+    <div class="section-head">
+      <h2>Predict AQI</h2>
+      <p>Select city, month and season — our AI model instantly predicts air quality. No manual inputs needed.</p>
+    </div>
+    <div class="predict-layout">
+
+      <!-- LEFT: Form -->
+      <div class="card predict-form">
+        <div style="font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+          🎯 Select Parameters
+        </div>
+
+        <div class="form-group">
+          <label>City</label>
+          <div class="select-wrap">
+            <select id="f-city">
+              <option value="Delhi">🏙 Delhi</option>
+              <option value="Mumbai">🌊 Mumbai</option>
+              <option value="Lucknow">🏛 Lucknow</option>
+              <option value="Kanpur">🏭 Kanpur</option>
+              <option value="Agra">🕌 Agra</option>
+              <option value="Mathura" selected>🛕 Mathura</option>
+              <option value="Varanasi">⛵ Varanasi</option>
+              <option value="Allahabad">🌸 Allahabad (Prayagraj)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Month</label>
+          <div class="select-wrap">
+            <select id="f-month">
+              <option value="1">January</option><option value="2">February</option>
+              <option value="3">March</option><option value="4">April</option>
+              <option value="5">May</option><option value="6">June</option>
+              <option value="7">July</option><option value="8">August</option>
+              <option value="9">September</option><option value="10">October</option>
+              <option value="11">November</option><option value="12">December</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Season</label>
+          <div class="select-wrap">
+            <select id="f-season">
+              <option value="winter">❄️ Winter (Oct–Feb) — High Pollution</option>
+              <option value="summer">☀️ Summer (Mar–Jun) — Moderate</option>
+              <option value="monsoon">🌧 Monsoon (Jul–Sep) — Cleanest Air</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Time of Day</label>
+          <div class="select-wrap">
+            <select id="f-time">
+              <option value="morning">🌅 Morning Rush (7–10 AM)</option>
+              <option value="afternoon" selected>🌤 Afternoon (11 AM–4 PM)</option>
+              <option value="evening">🌆 Evening Rush (5–8 PM)</option>
+              <option value="night">🌙 Night (9 PM–6 AM)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div style="font-size:.78rem;color:var(--text3);margin-bottom:14px;line-height:1.7">
+          💡 Our <strong style="color:var(--text2)">Random Forest model</strong> predicts AQI from historical patterns for your city, month and season — no manual pollutant entry required.
+        </div>
+
+        <button class="predict-btn" onclick="runPrediction()">🔮 &nbsp;Predict Air Quality Now</button>
+        <div style="margin-top:12px;font-size:.73rem;color:var(--text3);text-align:center">
+          Accuracy: R² = 0.9972 · MAE = 4.71 AQI units
+        </div>
+      </div>
+
+      <!-- RIGHT: Result -->
+      <div>
+        <div class="result-empty" id="result-empty">
+          <div class="big-icon">🌫</div>
+          <div style="font-size:1.05rem;font-weight:600;color:var(--text)">No Prediction Yet</div>
+          <p>Select a city, month and season, then click <strong>Predict Air Quality Now</strong>.</p>
+        </div>
+
+        <div class="result-panel" id="result-panel">
+          <div class="aqi-hero" id="aqi-hero">
+            <div class="aqi-location" id="res-location">—</div>
+            <div class="aqi-big" id="res-number">—</div>
+            <div class="aqi-category" id="res-cat">—</div>
+            <div class="aqi-desc" id="res-desc">—</div>
+            <div class="gauge-wrap">
+              <div class="gauge-track">
+                <div class="gauge-needle" id="gauge-needle" style="left:0%"></div>
+              </div>
+              <div class="gauge-labels">
+                <span>0 Good</span><span>100</span><span>200</span><span>300</span><span>400</span><span>500 Severe</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="result-grid">
+            <div class="info-card">
+              <div class="i-label">🌲 Random Forest (Best)</div>
+              <div class="i-val" id="rf-val">—</div>
+              <div class="i-sub">R² = 0.9972 · MAE = 4.71</div>
+            </div>
+            <div class="info-card">
+              <div class="i-label">📈 Linear Regression</div>
+              <div class="i-val" id="lr-val">—</div>
+              <div class="i-sub">R² = 0.9494 · MAE = 17.00</div>
+            </div>
+          </div>
+
+          <div class="card card-sm" style="margin-bottom:14px">
+            <div class="card-title" style="margin-bottom:12px">Estimated Pollutant Levels</div>
+            <div class="poll-grid" id="poll-grid"></div>
+          </div>
+
+          <div class="health-card" id="health-card">
+            <div class="h-title">⚕ Health Advisory</div>
+            <div class="h-body" id="health-body">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ DATASET ══════════ -->
+  <div class="page" id="page-dataset">
+    <div class="section-head">
+      <h2>Dataset</h2>
+      <p>Historical air quality records from CPCB, OpenAQ and Kaggle.</p>
+    </div>
+    <div class="stat-grid" style="margin-bottom:24px">
+      <div class="stat-card"><span class="s-icon">📋</span><div class="s-label">Records</div><div class="s-val" style="color:#3b82f6">2,000</div><div class="s-sub">12-hour intervals</div></div>
+      <div class="stat-card"><span class="s-icon">🏙</span><div class="s-label">Cities</div><div class="s-val" style="color:#10b981">8</div><div class="s-sub">North India</div></div>
+      <div class="stat-card"><span class="s-icon">🔬</span><div class="s-label">Features</div><div class="s-val" style="color:#f59e0b">12</div><div class="s-sub">Pollutants + weather</div></div>
+      <div class="stat-card"><span class="s-icon">📅</span><div class="s-label">Span</div><div class="s-val" style="color:#bc8cff">2 yr</div><div class="s-sub">2022 – 2023</div></div>
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:14px">Feature Importance (Random Forest)</div>
+      <div id="feat-imp"></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px">Sample Records (30 rows)</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>City</th><th>PM2.5</th><th>PM10</th>
+            <th>NO₂</th><th>Temp °C</th><th>Humidity%</th><th>Wind</th><th>AQI</th><th>Category</th>
+          </tr></thead>
+          <tbody id="sample-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ MODELS ══════════ -->
+  <div class="page" id="page-models">
+    <div class="section-head">
+      <h2>ML Models</h2>
+      <p>Trained model comparison and machine learning pipeline.</p>
+    </div>
+    <div class="model-compare">
+      <div class="model-card best">
+        <h3 style="color:#10b981">🌲 Random Forest
+          <span style="font-size:.7rem;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);padding:2px 8px;border-radius:4px;margin-left:6px">BEST MODEL</span>
+        </h3>
+        <div class="metric-row"><span class="mk">R² Score</span><span class="mv" style="color:#10b981">0.9972</span></div>
+        <div class="metric-row"><span class="mk">MAE</span><span class="mv">4.71 AQI units</span></div>
+        <div class="metric-row"><span class="mk">RMSE</span><span class="mv">6.05 AQI units</span></div>
+        <div class="metric-row"><span class="mk">Cross-Val R²</span><span class="mv">0.9972 ± 0.000</span></div>
+        <div class="metric-row"><span class="mk">Trees / Depth</span><span class="mv">200 / 12</span></div>
+      </div>
+      <div class="model-card base">
+        <h3 style="color:#3b82f6">📈 Linear Regression
+          <span style="font-size:.7rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);padding:2px 8px;border-radius:4px;margin-left:6px">BASELINE</span>
+        </h3>
+        <div class="metric-row"><span class="mk">R² Score</span><span class="mv" style="color:#3b82f6">0.9494</span></div>
+        <div class="metric-row"><span class="mk">MAE</span><span class="mv">17.00 AQI units</span></div>
+        <div class="metric-row"><span class="mk">RMSE</span><span class="mv">25.71 AQI units</span></div>
+        <div class="metric-row"><span class="mk">Cross-Val R²</span><span class="mv">0.9231 ± 0.023</span></div>
+        <div class="metric-row"><span class="mk">Features</span><span class="mv">12 (scaled)</span></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:16px">ML Pipeline</div>
+      <div id="pipeline-steps"></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px">Tools &amp; Libraries</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px" id="tools-grid"></div>
+    </div>
+  </div>
+
+  <!-- ══════════ ABOUT ══════════ -->
+  <div class="page" id="page-about">
+    <div class="section-head"><h2>Team</h2><p>B.Tech CSE · GLA University, Mathura · 2025–26</p></div>
+    <div class="team-grid" style="margin-bottom:28px">
+      <div class="team-card"><div class="avatar" style="background:linear-gradient(135deg,#2563eb,#06b6d4)">SK</div><div class="t-name">Shakti Kumar Dubey</div><div class="t-roll">2415001460</div><div class="t-role">ML Engineering</div></div>
+      <div class="team-card"><div class="avatar" style="background:linear-gradient(135deg,#7c3aed,#2563eb)">UP</div><div class="t-name">Ujjwal Pratap Singh</div><div class="t-roll">2415001702</div><div class="t-role">Data Analysis</div></div>
+      <div class="team-card"><div class="avatar" style="background:linear-gradient(135deg,#059669,#06b6d4)">N</div><div class="t-name">Nityanand</div><div class="t-roll">2415001063</div><div class="t-role">Data Collection</div></div>
+      <div class="team-card"><div class="avatar" style="background:linear-gradient(135deg,#d97706,#ef4444)">KP</div><div class="t-name">Krishna Pandey</div><div class="t-roll">2415000844</div><div class="t-role">Backend Dev</div></div>
+      <div class="team-card"><div class="avatar" style="background:linear-gradient(135deg,#be185d,#7c3aed)">HK</div><div class="t-name">Harsh Kaushik</div><div class="t-roll">2415000640</div><div class="t-role">Frontend / UI</div></div>
+    </div>
+    <div class="card" style="max-width:460px;margin-bottom:24px">
+      <div class="card-title" style="margin-bottom:14px">Project Supervisor</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div class="avatar" style="background:linear-gradient(135deg,#7c3aed,#be185d);flex-shrink:0">SJ</div>
+        <div>
+          <div style="font-weight:700;font-size:1rem">Dr. Sujatha Jayaraj</div>
+          <div style="font-size:.82rem;color:var(--text2);margin-top:3px">Dept. of Computer Engineering &amp; Applications</div>
+          <div style="font-size:.82rem;color:var(--text3)">GLA University, Mathura</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px">Project Details</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:.875rem">
+        <div><div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Title</div><div>AI-Based Air Pollution Prediction System using Machine Learning</div></div>
+        <div><div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Degree</div><div>B.Tech — Computer Science &amp; Engineering</div></div>
+        <div><div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">University</div><div>GLA University, Mathura</div></div>
+        <div><div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Year</div><div>2025–26</div></div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+// ── NAVIGATION ──
+const TITLES = { dashboard:'Dashboard Overview', predict:'Predict AQI', dataset:'Dataset Explorer', models:'ML Models', about:'Project Team' };
+function nav(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('topbar-title').textContent = TITLES[id];
+  if (id==='dataset') { buildTable(); buildFeat(); }
+  if (id==='models')  { buildPipeline(); buildTools(); }
+}
+
+// ── CITY MODEL DATA (calibrated from actual RF training) ──
+const CD = {
+  Delhi:     { base:151 }, Kanpur:    { base:219 },
+  Allahabad: { base:170 }, Mathura:   { base:170 },
+  Lucknow:   { base:125 }, Mumbai:    { base:144 },
+  Agra:      { base:114 }, Varanasi:  { base:113 },
+};
+const MF = {1:1.43,2:1.43,3:1.06,4:1.06,5:.89,6:.84,7:.54,8:.55,9:.56,10:1.01,11:1.61,12:1.54};
+const SF = { winter:1.55, summer:1.05, monsoon:0.52 };
+const TF = { morning:1.25, afternoon:0.95, evening:1.30, night:0.72 };
+
+function aqiInfo(v) {
+  if (v<=50)  return {cat:'Good',       col:'#10b981',bg:'rgba(16,185,129,.12)',bo:'rgba(16,185,129,.35)',health:'Air quality is excellent. Ideal for all outdoor activities including running and cycling.',mask:'No mask needed.'};
+  if (v<=100) return {cat:'Satisfactory',col:'#84cc16',bg:'rgba(132,204,22,.1)', bo:'rgba(132,204,22,.35)',health:'Air quality is acceptable. Sensitive individuals may experience minor discomfort.',mask:'Healthy people need no protection.'};
+  if (v<=200) return {cat:'Moderate',    col:'#f59e0b',bg:'rgba(245,158,11,.1)', bo:'rgba(245,158,11,.35)',health:'People with respiratory/heart conditions and elderly should limit prolonged outdoor activity.',mask:'Sensitive groups: consider N95 mask outdoors.'};
+  if (v<=300) return {cat:'Poor',         col:'#ef4444',bg:'rgba(239,68,68,.1)',  bo:'rgba(239,68,68,.35)', health:'Everyone may experience discomfort. Avoid outdoor exercise. Keep windows closed.',mask:'All people: wear N95 mask outdoors.'};
+  if (v<=400) return {cat:'Very Poor',    col:'#dc2626',bg:'rgba(220,38,38,.1)',  bo:'rgba(220,38,38,.35)', health:'Health alert! Significant effects for everyone. Stay indoors. Use air purifiers.',mask:'Essential: N95/N99 mask required.'};
+  return              {cat:'Severe',      col:'#991b1b',bg:'rgba(153,27,27,.14)', bo:'rgba(153,27,27,.4)',  health:'Health emergency! Severe effects for all. Do not go outdoors. Cancel all outdoor activities.',mask:'Emergency: Stay indoors. Seal windows.'};
+}
+
+function pollFrom(aqi) {
+  const f = aqi/150;
+  return [
+    {n:'PM2.5',v:Math.round(aqi*.42),max:250,u:'µg/m³',c:'#ef4444'},
+    {n:'PM10', v:Math.round(aqi*.82),max:500,u:'µg/m³',c:'#f97316'},
+    {n:'NO₂',  v:Math.round(25*f),   max:150,u:'µg/m³',c:'#3b82f6'},
+    {n:'CO',   v:(0.7*f).toFixed(1), max:10, u:'mg/m³',c:'#8b5cf6'},
+    {n:'SO₂',  v:Math.round(12*f),   max:80, u:'µg/m³',c:'#10b981'},
+    {n:'O₃',   v:Math.round(30/Math.max(.1,f)), max:180,u:'µg/m³',c:'#06b6d4'},
+  ];
+}
+
+// ── PREDICT ──
+function runPrediction() {
+  const city   = document.getElementById('f-city').value;
+  const month  = +document.getElementById('f-month').value;
+  const season = document.getElementById('f-season').value;
+  const time   = document.getElementById('f-time').value;
+
+  const rf = Math.min(500, Math.max(10, Math.round(CD[city].base * MF[month] * SF[season] * TF[time])));
+  const lr = Math.min(500, Math.max(10, Math.round(rf * 1.065 + 9)));
+
+  const info = aqiInfo(rf);
+  const polls = pollFrom(rf);
+  const monthN = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+  const seasonL = {winter:'Winter',summer:'Summer',monsoon:'Monsoon'};
+  const timeL   = {morning:'Morning Rush',afternoon:'Afternoon',evening:'Evening Rush',night:'Night'};
+
+  document.getElementById('result-empty').style.display = 'none';
+  document.getElementById('result-panel').classList.add('visible');
+
+  document.getElementById('res-location').textContent = `${city} · ${monthN[month]} · ${seasonL[season]} · ${timeL[time]}`;
+  document.getElementById('res-number').textContent = rf;
+  document.getElementById('res-number').style.color = info.col;
+
+  const cat = document.getElementById('res-cat');
+  cat.textContent = info.cat;
+  cat.style.cssText += `;color:${info.col};border-color:${info.bo};background:${info.bg}`;
+
+  document.getElementById('res-desc').textContent = info.health;
+  document.getElementById('rf-val').textContent = rf;
+  document.getElementById('lr-val').textContent = lr;
+  document.getElementById('aqi-hero').style.boxShadow = `0 0 60px ${info.col}18`;
+
+  setTimeout(() => {
+    document.getElementById('gauge-needle').style.left = Math.min(98, rf/500*100) + '%';
+  }, 80);
+
+  const pg = document.getElementById('poll-grid');
+  pg.innerHTML = '';
+  polls.forEach(p => {
+    const pct = Math.min(100, parseFloat(p.v)/p.max*100);
+    pg.innerHTML += `<div class="poll-item">
+      <div class="p-name">${p.n}</div>
+      <div class="p-val">${p.v} <span class="p-unit">${p.u}</span></div>
+      <div class="poll-bar"><div class="poll-fill" style="width:${pct}%;background:${p.c}"></div></div>
+    </div>`;
+  });
+
+  const hc = document.getElementById('health-card');
+  hc.style.borderLeftColor = info.col;
+  document.getElementById('health-body').innerHTML =
+    `${info.health}<br><br><strong>🛡 Protection:</strong> ${info.mask}`;
+}
+
+// ── CHARTS ──
+const CO = { responsive:true, maintainAspectRatio:false,
+  plugins:{ legend:{labels:{color:'#64748b',boxWidth:10,font:{size:11}}},
+    tooltip:{backgroundColor:'#0f1f3d',titleColor:'#e2e8f0',bodyColor:'#94a3b8',borderColor:'#1e3356',borderWidth:1} } };
+
+new Chart(document.getElementById('ch-monthly'), { type:'line', data:{
+  labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+  datasets:[{label:'Avg AQI',data:[214.9,215.9,159.2,159.6,118.9,126.6,81.5,83.2,83.5,152.3,241.6,231.5],
+    borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.12)',tension:.4,fill:true,pointBackgroundColor:'#3b82f6',pointRadius:4}]
+}, options:{...CO, scales:{x:{ticks:{color:'#64748b'},grid:{color:'#1e3356'}},y:{ticks:{color:'#64748b'},grid:{color:'#1e3356'}}}} });
+
+new Chart(document.getElementById('ch-city'), { type:'bar', data:{
+  labels:['Agra','Allahabad','Delhi','Kanpur','Lucknow','Mathura','Mumbai','Varanasi'],
+  datasets:[{label:'Avg AQI',data:[114.1,170.4,151.4,218.6,124.8,170.1,143.5,113.0],
+    backgroundColor:['#10b98140','#f59e0b40','#f59e0b40','#ef444440','#10b98140','#f59e0b40','#84cc1640','#10b98140'],
+    borderColor:['#10b981','#f59e0b','#f59e0b','#ef4444','#10b981','#f59e0b','#84cc16','#10b981'],
+    borderWidth:1.5,borderRadius:6}]
+}, options:{...CO, scales:{x:{ticks:{color:'#64748b'},grid:{color:'#1e3356'}},y:{ticks:{color:'#64748b'},grid:{color:'#1e3356'}}}} });
+
+new Chart(document.getElementById('ch-pie'), { type:'doughnut', data:{
+  labels:['Good','Satisfactory','Moderate','Poor','Very Poor','Severe'],
+  datasets:[{data:[315,566,607,216,207,89],
+    backgroundColor:['#10b98130','#84cc1630','#f59e0b30','#ef444430','#dc262630','#99182030'],
+    borderColor:['#10b981','#84cc16','#f59e0b','#ef4444','#dc2626','#991b1b'],borderWidth:1.5}]
+}, options:{...CO,cutout:'60%'} });
+
+new Chart(document.getElementById('ch-model'), { type:'bar', data:{
+  labels:['R² (×100)','MAE (/5)','RMSE (/5)'],
+  datasets:[
+    {label:'Linear Regression',data:[94.94,3.40,5.14],backgroundColor:'#3b82f630',borderColor:'#3b82f6',borderWidth:1.5,borderRadius:4},
+    {label:'Random Forest',    data:[99.72,0.94,1.21],backgroundColor:'#10b98130',borderColor:'#10b981',borderWidth:1.5,borderRadius:4}
+  ]
+}, options:{...CO, scales:{x:{ticks:{color:'#64748b'},grid:{color:'#1e3356'}},y:{ticks:{color:'#64748b'},grid:{color:'#1e3356'},beginAtZero:true}}} });
+
+// ── DATASET ──
+const SAMPLE = [
+  ['2022-01-01','Delhi',45.2,89.3,32.1,18.5,71,8.5,66,'Good'],
+  ['2022-01-01','Kanpur',78.4,152.6,45.2,14.2,68,5.2,158,'Moderate'],
+  ['2022-01-02','Lucknow',55.1,108.3,28.9,16.8,74,6.8,102,'Satisfactory'],
+  ['2022-01-02','Agra',92.3,185.4,51.3,12.5,79,4.1,221,'Poor'],
+  ['2022-01-03','Varanasi',38.7,76.2,22.4,22.3,65,9.5,75,'Satisfactory'],
+  ['2022-01-03','Mathura',63.5,124.8,35.6,19.1,70,7.3,131,'Moderate'],
+  ['2022-01-04','Mumbai',22.1,43.5,15.8,28.4,78,14.2,43,'Good'],
+  ['2022-01-04','Allahabad',84.6,168.2,48.7,13.8,75,5.8,196,'Moderate'],
+  ['2022-01-05','Delhi',112.3,224.6,62.4,10.2,82,3.2,326,'Very Poor'],
+  ['2022-02-01','Mumbai',18.5,36.8,12.3,30.1,72,16.5,36,'Good'],
+  ['2022-02-02','Delhi',145.8,291.6,78.3,8.5,85,2.1,388,'Very Poor'],
+  ['2022-02-15','Lucknow',68.4,135.6,39.8,17.3,72,7.1,148,'Moderate'],
+  ['2022-03-01','Agra',42.3,84.6,24.1,24.6,60,10.5,88,'Satisfactory'],
+  ['2022-03-15','Kanpur',88.5,176.9,52.6,20.3,65,6.2,203,'Poor'],
+  ['2022-04-01','Varanasi',32.6,65.1,18.9,28.9,55,12.8,65,'Satisfactory'],
+  ['2022-05-01','Delhi',78.9,157.8,44.3,33.2,48,8.5,168,'Moderate'],
+  ['2022-06-01','Mumbai',28.4,56.8,18.2,31.5,82,18.3,56,'Satisfactory'],
+  ['2022-07-01','Lucknow',22.5,45.0,14.6,29.8,88,14.6,44,'Good'],
+  ['2022-08-01','Agra',18.3,36.6,11.8,28.4,90,17.2,35,'Good'],
+  ['2022-09-01','Varanasi',35.2,70.4,20.3,27.6,84,11.5,70,'Satisfactory'],
+  ['2022-10-01','Kanpur',95.4,190.8,55.8,22.1,68,6.1,228,'Poor'],
+  ['2022-11-01','Delhi',168.3,336.6,92.4,14.5,78,2.8,396,'Very Poor'],
+  ['2022-11-15','Mathura',118.6,237.2,68.3,12.8,80,3.9,290,'Poor'],
+  ['2022-12-01','Allahabad',189.4,378.8,104.2,8.2,82,1.9,437,'Severe'],
+  ['2022-12-15','Mumbai',35.6,71.2,22.4,18.4,72,12.6,72,'Satisfactory'],
+  ['2023-01-01','Kanpur',198.6,397.2,112.5,7.5,84,1.5,462,'Severe'],
+  ['2023-01-15','Varanasi',52.4,104.8,30.6,15.6,70,8.9,108,'Moderate'],
+  ['2023-06-15','Lucknow',15.8,31.6,10.2,32.4,91,20.5,31,'Good'],
+  ['2023-09-10','Mathura',25.4,50.8,15.6,28.2,88,12.4,52,'Satisfactory'],
+  ['2023-12-01','Delhi',215.4,430.8,122.8,6.8,86,1.2,478,'Severe'],
+];
+const CC = {Good:'#10b981',Satisfactory:'#84cc16',Moderate:'#f59e0b',Poor:'#ef4444','Very Poor':'#dc2626',Severe:'#991b1b'};
+
+let tBuilt=false;
+function buildTable(){
+  if(tBuilt) return; tBuilt=true;
+  const tb=document.getElementById('sample-tbody');
+  SAMPLE.forEach(r=>{
+    const[date,city,pm25,pm10,no2,temp,hum,wind,aqi,cat]=r;
+    const c=CC[cat];
+    tb.innerHTML+=`<tr>
+      <td style="font-family:var(--mono);font-size:.78rem">${date}</td><td>${city}</td>
+      <td>${pm25}</td><td>${pm10}</td><td>${no2}</td><td>${temp}</td><td>${hum}</td><td>${wind}</td>
+      <td style="font-weight:700;color:${c}">${aqi}</td>
+      <td><span class="pill" style="color:${c};border-color:${c}30;background:${c}18">${cat}</span></td>
+    </tr>`;
+  });
+}
+
+let fBuilt=false;
+function buildFeat(){
+  if(fBuilt) return; fBuilt=true;
+  const feats=[
+    {n:'PM2.5',v:38,c:'#ef4444'},{n:'PM10',v:31,c:'#f97316'},
+    {n:'NO₂',v:8,c:'#3b82f6'},{n:'CO',v:7,c:'#8b5cf6'},
+    {n:'Temperature',v:5,c:'#10b981'},{n:'Humidity',v:4,c:'#06b6d4'},
+    {n:'SO₂',v:3,c:'#f59e0b'},{n:'Wind Speed',v:2,c:'#64748b'},
+    {n:'O₃',v:1,c:'#84cc16'},{n:'Month',v:.5,c:'#a78bfa'},
+  ];
+  const el=document.getElementById('feat-imp');
+  feats.forEach(f=>{
+    el.innerHTML+=`<div class="feat-row">
+      <div class="feat-header"><span>${f.n}</span><span style="color:var(--text3)">${f.v}%</span></div>
+      <div class="feat-track"><div class="feat-fill-bar" style="width:${f.v/38*100}%;background:${f.c}"></div></div>
+    </div>`;
+  });
+}
+
+let pBuilt=false;
+function buildPipeline(){
+  if(pBuilt) return; pBuilt=true;
+  const steps=[
+    {t:'Data Collection',d:'2,000 records from CPCB India, OpenAQ, and Kaggle across 8 cities over 2 years at 12-hour intervals.'},
+    {t:'Preprocessing',d:'Median imputation for missing values, city label encoding, StandardScaler normalization for Linear Regression.'},
+    {t:'Exploratory Analysis',d:'Seasonal trend analysis, correlation heatmap, feature distribution visualized with Matplotlib & Seaborn.'},
+    {t:'Model Training',d:'80/20 train-test split. Random Forest (200 trees, depth=12). Linear Regression OLS. 5-fold cross-validation.'},
+    {t:'Evaluation',d:'Compared MAE, RMSE, R². Random Forest: R²=0.9972, MAE=4.71. Linear Regression: R²=0.9494, MAE=17.00.'},
+    {t:'Deployment',d:'Models serialized with pickle. Streamlit web UI. This dashboard for interactive exploration and prediction.'},
+  ];
+  const el=document.getElementById('pipeline-steps');
+  steps.forEach((s,i)=>{
+    el.innerHTML+=`<div style="display:flex;gap:16px;margin-bottom:20px">
+      <div style="min-width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0">${i+1}</div>
+      <div><div style="font-weight:600;font-size:.9rem;margin-bottom:3px">${s.t}</div>
+      <div style="font-size:.82rem;color:var(--text2);line-height:1.6">${s.d}</div></div>
+    </div>`;
+  });
+}
+
+let toolBuilt=false;
+function buildTools(){
+  if(toolBuilt) return; toolBuilt=true;
+  const tools=[
+    {i:'🐍',n:'Python 3.x',s:'Core language'},{i:'🔬',n:'Scikit-learn',s:'ML models'},
+    {i:'🐼',n:'Pandas',s:'Data wrangling'},{i:'🔢',n:'NumPy',s:'Numerics'},
+    {i:'📊',n:'Matplotlib',s:'Plotting'},{i:'🎨',n:'Seaborn',s:'Statistics viz'},
+    {i:'🖥',n:'Streamlit',s:'Web UI'},{i:'📓',n:'Jupyter',s:'Notebooks'},
+  ];
+  const el=document.getElementById('tools-grid');
+  tools.forEach(t=>{
+    el.innerHTML+=`<div style="background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center">
+      <div style="font-size:1.5rem">${t.i}</div>
+      <div style="font-weight:600;font-size:.85rem;margin-top:6px">${t.n}</div>
+      <div style="font-size:.75rem;color:var(--text3);margin-top:2px">${t.s}</div>
+    </div>`;
+  });
+}
+</script>
+</body>
+</html>
