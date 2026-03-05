@@ -1,0 +1,7 @@
+# AI Video Generator Agent — Python dependencies
+# Install with: pip install -r requirements_video.txt
+
+Pillow>=10.0.0        # Image frame rendering (slides)
+gTTS>=2.3.2           # Google Text-to-Speech voice-over
+moviepy>=2.0.0        # Video assembly (images + audio → MP4)
+numpy>=1.24.0         # NumPy array conversion for MoviePy
